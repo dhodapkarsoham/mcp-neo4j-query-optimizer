@@ -280,10 +280,6 @@ echo '{"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "op
 - **MCP Integration**: Use directly in Claude Desktop with the MCP server
 - **Testing**: Test the server directly with the provided examples
 
----
-
-**Happy Query Optimizing! 🚀** 
-
 ## 📋 Troubleshooting
 
 ### Common Issues
@@ -299,3 +295,7 @@ echo '{"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "op
 **❌ "Connection timeout"**
 - Check your network connection
 - Verify Neo4j database is accessible
+
+---
+
+**Happy Query Optimizing! 🚀** 
