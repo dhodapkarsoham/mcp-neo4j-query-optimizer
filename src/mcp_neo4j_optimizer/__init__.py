@@ -5,7 +5,6 @@ A comprehensive MCP (Model Context Protocol) server for analyzing and optimizing
 """
 
 __version__ = "0.1.0"
-__author__ = "Neo4j Query Optimizer Team"
 
 from .agent import Neo4jOptimizerAgent, main
 
