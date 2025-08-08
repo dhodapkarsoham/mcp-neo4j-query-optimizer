@@ -182,7 +182,7 @@ Add this to your Claude Desktop or other MCP client configuration:
       "command": "python",
       "args": ["/path/to/your/src/mcp_neo4j_optimizer/agent.py"],
       "env": {
-        "NEO4J_URI": "bolt+s://your-db-id.databases.neo4j.io",
+        "NEO4J_URI": "neo4j+s://your-db-id.databases.neo4j.io",
         "NEO4J_USER": "neo4j", 
         "NEO4J_PASSWORD": "your-password"
       }
