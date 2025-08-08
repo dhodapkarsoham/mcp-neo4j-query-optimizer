@@ -1,5 +1,7 @@
 # 🔍 Neo4j Query Optimizer MCP Agent
 
+> **⚠️ Work in Progress**: This repository is actively being developed. Feel free to try it out and provide feedback, but expect some changes and improvements as we development continues.
+
 A comprehensive MCP (Model Context Protocol) server for analyzing and optimizing Neo4j Cypher queries using intelligent operator-based analysis. Perfect for integration with Claude Desktop and other MCP clients.
 
 ## ✨ Features
