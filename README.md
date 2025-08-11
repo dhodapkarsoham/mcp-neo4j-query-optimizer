@@ -120,8 +120,8 @@ The optimizer provides:
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Claude        │    │   MCP Agent      │    │   Neo4j         │
-│   Desktop       │◄──►│   (JSON-RPC)     │◄──►│   Database      │
+│   Claude        │    │   MCP Server     │    │   Neo4j         │
+│   Desktop       │◄──►│                  │◄──►│   Database      │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
                               │
                               ▼
