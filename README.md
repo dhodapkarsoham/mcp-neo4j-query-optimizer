@@ -87,7 +87,7 @@ The optimizer analyzes these Neo4j query plan operators:
 | **Sort** | Medium | Sorting operations |
 | **Limit** | Low | Result limiting (good) |
 | **Skip** | Medium | Pagination operations |
-| **Aggregation** | Medium | Data aggregation |
+| **EagerAggregation** | Medium | Data aggregation |
 | **DirectedAllRelationshipsScan** | High | Relationship scans |
 | **UndirectedAllRelationshipsScan** | Critical | Bidirectional scans |
 
