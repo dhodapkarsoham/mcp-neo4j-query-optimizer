@@ -82,7 +82,7 @@ The optimizer analyzes these Neo4j query plan operators:
 | **NodeByLabelScan** | High | Label-based scan |
 | **NodeIndexScan** | Low | Index usage (good) |
 | **CartesianProduct** | Critical | Cross-join operation |
-| **Expand** | Medium | Relationship expansion |
+| **Expand(All)** | Medium | Relationship expansion |
 | **Filter** | Medium | Late-applied filters |
 | **Sort** | Medium | Sorting operations |
 | **Limit** | Low | Result limiting (good) |
