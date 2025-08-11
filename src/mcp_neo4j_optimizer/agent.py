@@ -160,6 +160,16 @@ class Neo4jOptimizerAgent:
                     "depth": depth,
                     "impact": "Scans all relationships - very expensive"
                 })
+
+            elif clean_operator == "UndirectedAllRelationshipsScan":
+                issues.append({
+                    "severity": "Critical",
+                    "operator": operator,
+                    "issue": "Scanning all relationships in database",
+                    "suggestion": "Specify a relationship direction and relationship types (e.g., [:KNOWS])",
+                    "depth": depth,
+                    "impact": "Scans all relationships and produces 2x rows - very expensive"
+                })
             
             # HIGH PERFORMANCE ISSUES
             elif clean_operator == "NodeByLabelScan":
@@ -182,7 +192,7 @@ class Neo4jOptimizerAgent:
                     "impact": "Scans entire index - less efficient than seeking"
                 })
             
-            elif clean_operator == "Expand":
+            elif clean_operator == "Expand(All)":
                 if estimated_rows > 10000:
                     issues.append({
                         "severity": "High",
@@ -216,7 +226,7 @@ class Neo4jOptimizerAgent:
                         "impact": "Sorting large datasets in memory"
                     })
             
-            elif clean_operator == "Aggregate":
+            elif clean_operator == "EagerAggregation":
                 if estimated_rows > 10000:
                     issues.append({
                         "severity": "Medium",
@@ -261,26 +271,16 @@ class Neo4jOptimizerAgent:
                     })
             
             # JOIN OPERATORS
-            elif clean_operator in ["NodeHashJoin", "NodeLeftHashJoin"]:
+            elif clean_operator in ["NodeHashJoin", "NodeLeftOuterHashJoin","NodeRightOuterHashJoin"]:
                 if estimated_rows > 10000:
                     issues.append({
                         "severity": "Medium",
                         "operator": operator,
                         "issue": f"Large hash join ({estimated_rows} estimated rows)",
-                        "suggestion": "Ensure proper indexes exist on join properties",
+                        "suggestion": "Using indexed properties may help; alternatively, explore Join Hints",
                         "depth": depth,
                         "impact": "Hash joining large datasets"
                     })
-            
-            elif clean_operator == "Apply":
-                issues.append({
-                    "severity": "Medium",
-                    "operator": operator,
-                    "issue": "Subquery execution detected",
-                    "suggestion": "Consider rewriting as a single query or ensure subquery is optimized",
-                    "depth": depth,
-                    "impact": "Executing subqueries for each row"
-                })
             
             # GENERAL PERFORMANCE CHECKS
             if db_hits > 10000:
