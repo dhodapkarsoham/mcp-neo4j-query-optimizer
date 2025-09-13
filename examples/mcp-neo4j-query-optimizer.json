@@ -2,7 +2,7 @@
   "mcpServers": {
     "neo4j-query-optimizer": {
       "command": "python",
-      "args": ["/path/to/your/src/mcp_neo4j_optimizer/agent.py"],
+      "args": ["/Users/sohamdhodapkar/Projects/internal/mcp-query-optimizer/src/mcp_neo4j_optimizer/agent.py"],
       "env": {
         "NEO4J_URI": "bolt+s://your-db-id.databases.neo4j.io",
         "NEO4J_USER": "neo4j",

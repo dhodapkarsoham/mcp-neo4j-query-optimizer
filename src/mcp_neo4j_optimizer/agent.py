@@ -2,20 +2,392 @@
 """
 Neo4j Query Optimizer Agent - MCP Server
 Analyzes query plans, optimizes queries, and shows before/after comparisons.
+Provides rich, structured analysis for MCP clients to interpret intelligently.
 """
 
 import json
 import os
 import sys
-from typing import Dict, Any, Optional, List
+import re
+from typing import Dict, Any, Optional, List, Tuple
+from dataclasses import dataclass
+from enum import Enum
 
 from neo4j import GraphDatabase, basic_auth
 
-# Neo4j credentials are loaded from Claude Desktop config env section
+# Neo4j credentials are loaded from MCP client config env section
 # No .env file loading needed
 
 # Global variables
 driver = None
+
+class Severity(Enum):
+    """Performance issue severity levels"""
+    CRITICAL = "Critical"
+    HIGH = "High"
+    MEDIUM = "Medium"
+    LOW = "Low"
+    INFO = "Info"
+
+@dataclass
+class PerformanceIssue:
+    """Represents a performance issue found in query analysis"""
+    severity: Severity
+    operator: str
+    issue: str
+    suggestion: str
+    impact: str
+    depth: int
+    estimated_rows: Optional[int] = None
+    db_hits: Optional[int] = None
+
+@dataclass
+class QueryAnalysis:
+    """Comprehensive query analysis results"""
+    query_type: str
+    complexity: str
+    performance_issues: List[PerformanceIssue]
+    optimization_opportunities: List[str]
+    index_recommendations: List[str]
+    query_patterns: List[str]
+    performance_characteristics: str
+    best_practices: List[str]
+    estimated_total_rows: int
+    estimated_db_hits: int
+
+class Neo4jAnalyzer:
+    """Neo4j query analyzer that extracts structured operator data for MCP clients to interpret"""
+    
+    def __init__(self):
+        print("✅ Neo4j analyzer initialized for structured data extraction", file=sys.stderr)
+    
+    def analyze_operators(self, operators: List[Dict], query: str) -> List[Dict[str, Any]]:
+        """Extract structured operator data for MCP client interpretation"""
+        operator_data = []
+        
+        for op in operators:
+            operator = op.get("operator", "Unknown")
+            clean_operator = operator.split("@")[0] if "@" in operator else operator
+            estimated_rows = op.get("estimated_rows", 0)
+            db_hits = op.get("db_hits", 0)
+            depth = op.get("depth", 0)
+            args = op.get("args", {})
+            identifiers = op.get("identifiers", [])
+            
+            # Extract operator characteristics for MCP client analysis
+            operator_info = {
+                "operator": operator,
+                "clean_operator": clean_operator,
+                "estimated_rows": estimated_rows,
+                "db_hits": db_hits,
+                "depth": depth,
+                "args": args,
+                "identifiers": identifiers,
+                "is_leaf": self._is_leaf_operator(clean_operator),
+                "is_updating": self._is_updating_operator(clean_operator),
+                "is_eager": self._is_eager_operator(clean_operator),
+                "performance_characteristics": self._get_operator_characteristics(clean_operator, estimated_rows, db_hits)
+            }
+            
+            operator_data.append(operator_info)
+        
+        return operator_data
+    
+    def _is_leaf_operator(self, operator: str) -> bool:
+        """Determine if operator is a leaf operator based on Neo4j documentation"""
+        leaf_operators = {
+            "AllNodesScan", "Argument", "ArgumentTracker", "AssertingMultiNodeIndexSeek",
+            "AssertingMultiRelationshipIndexSeek", "AssertingSingleNodeIndexSeek",
+            "AssertingSingleRelationshipIndexSeek", "DirectedAllRelationshipsScan",
+            "DirectedRelationshipByElementIdSeek", "DirectedRelationshipByIdSeek",
+            "DirectedRelationshipIndexContainsScan", "DirectedRelationshipIndexEndsWithScan",
+            "DirectedRelationshipIndexScan", "DirectedRelationshipIndexSeek",
+            "DirectedRelationshipIndexSeekByRange", "DirectedRelationshipTypeScan",
+            "DirectedUnionRelationshipTypesScan", "NodeByElementIdSeek", "NodeByIdSeek",
+            "NodeByLabelScan", "NodeIndexContainsScan", "NodeIndexEndsWithScan",
+            "NodeIndexScan", "NodeIndexSeek", "NodeIndexSeekByRange", "NodeUniqueIndexSeek",
+            "NodeUniqueIndexSeekByRange", "UndirectedAllRelationshipsScan",
+            "UndirectedRelationshipByElementIdSeek", "UndirectedRelationshipByIdSeek",
+            "UndirectedRelationshipIndexContainsScan", "UndirectedRelationshipIndexEndsWithScan",
+            "UndirectedRelationshipIndexScan", "UndirectedRelationshipIndexSeek",
+            "UndirectedRelationshipIndexSeekByRange", "UndirectedRelationshipTypeScan",
+            "UndirectedUnionRelationshipTypesScan", "UnionNodeByLabelsScan"
+        }
+        return operator in leaf_operators
+    
+    def _is_updating_operator(self, operator: str) -> bool:
+        """Determine if operator is an updating operator"""
+        updating_operators = {
+            "Create", "Delete", "MergeCreateNode", "MergeCreateRelationship",
+            "RemoveLabels", "SetLabels", "SetNodeProperties", "SetNodeProperty",
+            "SetProperties", "SetProperty", "SetRelationshipProperties", "SetRelationshipProperty"
+        }
+        return operator in updating_operators
+    
+    def _is_eager_operator(self, operator: str) -> bool:
+        """Determine if operator is an eager operator"""
+        eager_operators = {
+            "EagerAggregation", "EagerLimit", "EagerSort", "EagerUnion",
+            "ValueHashJoin", "CartesianProduct"
+        }
+        return operator in eager_operators or "Eager" in operator
+    
+    def _get_operator_characteristics(self, operator: str, estimated_rows: int, db_hits: int) -> Dict[str, Any]:
+        """Extract performance characteristics for MCP client analysis"""
+        characteristics = {
+            "operator_type": operator,
+            "estimated_rows": estimated_rows,
+            "db_hits": db_hits,
+            "performance_indicators": []
+        }
+        
+        # Add performance indicators based on operator type and metrics
+        if estimated_rows > 100000:
+            characteristics["performance_indicators"].append("high_row_count")
+        if db_hits > 10000:
+            characteristics["performance_indicators"].append("high_db_hits")
+        if operator in ["AllNodesScan", "UndirectedAllRelationshipsScan"]:
+            characteristics["performance_indicators"].append("full_scan")
+        if operator in ["CartesianProduct"]:
+            characteristics["performance_indicators"].append("cartesian_product")
+        if "Index" in operator:
+            characteristics["performance_indicators"].append("index_usage")
+        if "Eager" in operator:
+            characteristics["performance_indicators"].append("eager_operation")
+        
+        return characteristics
+    
+    def analyze_query(self, query: str, operators: List[Dict] = None) -> Dict[str, Any]:
+        """Extract comprehensive structured query data for MCP client analysis"""
+        if operators is None:
+            operators = []
+        
+        # Extract structured operator data
+        operator_data = self.analyze_operators(operators, query)
+        
+        # Classify query type and complexity
+        query_type = self._classify_query_type(query)
+        complexity = self._assess_query_complexity(query)
+        
+        # Identify patterns and characteristics
+        query_patterns = self._identify_query_patterns(query)
+        performance_characteristics = self._analyze_performance_characteristics(query)
+        
+        # Calculate totals
+        estimated_total_rows = sum(op.get("estimated_rows", 0) for op in operators)
+        estimated_db_hits = sum(op.get("db_hits", 0) for op in operators)
+        
+        # Return structured data for MCP client interpretation
+        return {
+            "query": query,
+            "query_type": query_type,
+            "complexity": complexity,
+            "query_patterns": query_patterns,
+            "performance_characteristics": performance_characteristics,
+            "operators": operator_data,
+            "summary": {
+                "total_operators": len(operator_data),
+                "leaf_operators": len([op for op in operator_data if op["is_leaf"]]),
+                "updating_operators": len([op for op in operator_data if op["is_updating"]]),
+                "eager_operators": len([op for op in operator_data if op["is_eager"]]),
+                "estimated_total_rows": estimated_total_rows,
+                "estimated_db_hits": estimated_db_hits
+            },
+            "performance_indicators": self._extract_performance_indicators(operator_data),
+            "query_metadata": {
+                "has_where_clause": "WHERE" in query,
+                "has_order_by": "ORDER BY" in query,
+                "has_limit": "LIMIT" in query,
+                "has_aggregation": any(func in query.upper() for func in ["COUNT(", "SUM(", "AVG(", "MIN(", "MAX("]),
+                "has_relationships": "-[" in query and "]->" in query
+            }
+        }
+    
+    def _extract_performance_indicators(self, operator_data: List[Dict]) -> List[str]:
+        """Extract overall performance indicators from operator data"""
+        indicators = set()
+        
+        for op in operator_data:
+            indicators.update(op["performance_characteristics"]["performance_indicators"])
+        
+        return list(indicators)
+    
+    def _classify_query_type(self, query: str) -> str:
+        """Classify the type of query"""
+        query_upper = query.upper()
+        if "CREATE" in query_upper:
+            return "write"
+        elif "DELETE" in query_upper or "REMOVE" in query_upper:
+            return "delete"
+        elif "SET" in query_upper or "MERGE" in query_upper:
+            return "update"
+        elif "MATCH" in query_upper and "RETURN" in query_upper:
+            return "read"
+        else:
+            return "unknown"
+    
+    def _assess_query_complexity(self, query: str) -> str:
+        """Assess query complexity based on patterns"""
+        complexity_score = 0
+        
+        # Basic patterns
+        if "MATCH" in query:
+            complexity_score += 1
+        if "WHERE" in query:
+            complexity_score += 1
+        if "ORDER BY" in query:
+            complexity_score += 1
+        if "LIMIT" in query:
+            complexity_score += 1
+        
+        # Advanced patterns
+        if "COUNT(" in query or "SUM(" in query or "AVG(" in query:
+            complexity_score += 2
+        if "UNION" in query.upper():
+            complexity_score += 2
+        if "CASE" in query.upper():
+            complexity_score += 1
+        if "WITH" in query.upper():
+            complexity_score += 1
+        
+        # Relationship complexity
+        relationship_count = len(re.findall(r'\[.*?\]', query))
+        complexity_score += min(relationship_count, 3)  # Cap at 3
+        
+        if complexity_score <= 2:
+            return "simple"
+        elif complexity_score <= 5:
+            return "medium"
+        else:
+            return "complex"
+    
+    def _identify_query_patterns(self, query: str) -> List[str]:
+        """Identify query patterns for context"""
+        patterns = []
+        
+        if "MATCH (" in query:
+            patterns.append("node matching")
+        
+        if "-[" in query and "]->" in query:
+            patterns.append("relationship traversal")
+        
+        if "WHERE" in query:
+            patterns.append("property filtering")
+        
+        if "ORDER BY" in query:
+            patterns.append("result sorting")
+        
+        if "LIMIT" in query:
+            patterns.append("result limiting")
+        
+        if "COUNT(" in query or "SUM(" in query or "AVG(" in query:
+            patterns.append("aggregation")
+        
+        if "UNION" in query.upper():
+            patterns.append("query union")
+        
+        if "WITH" in query.upper():
+            patterns.append("query chaining")
+        
+        return patterns
+    
+    def _analyze_performance_characteristics(self, query: str) -> str:
+        """Analyze performance characteristics of the query"""
+        characteristics = []
+        
+        if "MATCH (n)" in query and ":" not in query:
+            characteristics.append("Full database scan - will be slow on large datasets")
+        
+        if "WHERE" not in query:
+            characteristics.append("No filtering - may return large result sets")
+        
+        if "LIMIT" not in query:
+            characteristics.append("No result limiting - potential for memory issues")
+        
+        if "ORDER BY" in query:
+            characteristics.append("Sorting operation - consider indexes on sorted properties")
+        
+        if "COUNT(" in query or "SUM(" in query:
+            characteristics.append("Aggregation operation - may be memory intensive")
+        
+        if "UNION" in query.upper():
+            characteristics.append("Query union - multiple result sets combined")
+        
+        return "; ".join(characteristics) if characteristics else "Query appears well-structured"
+    
+
+class ConversationalInterface:
+    """Generates structured context for MCP clients to interpret Neo4j query analysis"""
+    
+    def __init__(self, analyzer: Neo4jAnalyzer):
+        self.analyzer = analyzer
+    
+    def generate_rich_context(self, query: str, analysis: Dict[str, Any]) -> str:
+        """Generate structured context for MCP clients to interpret and discuss"""
+        context = f"""# Neo4j Query Analysis - Structured Data for MCP Client
+
+## Query Information
+- **Query**: {analysis['query']}
+- **Type**: {analysis['query_type']} query
+- **Complexity**: {analysis['complexity']}
+- **Patterns**: {', '.join(analysis['query_patterns'])}
+
+## Execution Plan Summary
+- **Total Operators**: {analysis['summary']['total_operators']}
+- **Leaf Operators**: {analysis['summary']['leaf_operators']}
+- **Updating Operators**: {analysis['summary']['updating_operators']}
+- **Eager Operators**: {analysis['summary']['eager_operators']}
+- **Estimated Total Rows**: {analysis['summary']['estimated_total_rows']:,}
+- **Estimated DB Hits**: {analysis['summary']['estimated_db_hits']:,}
+
+## Performance Indicators
+{chr(10).join([f"- {indicator}" for indicator in analysis['performance_indicators']])}
+
+## Query Metadata
+- **Has WHERE clause**: {analysis['query_metadata']['has_where_clause']}
+- **Has ORDER BY**: {analysis['query_metadata']['has_order_by']}
+- **Has LIMIT**: {analysis['query_metadata']['has_limit']}
+- **Has Aggregation**: {analysis['query_metadata']['has_aggregation']}
+- **Has Relationships**: {analysis['query_metadata']['has_relationships']}
+
+## Operator Details
+{self._format_operator_details(analysis['operators'])}
+
+## Performance Characteristics
+{analysis['performance_characteristics']}
+
+## MCP Client Instructions
+Based on this structured data and your knowledge of Neo4j operators from the official documentation, provide:
+1. Performance analysis and recommendations
+2. Optimization suggestions
+3. Index recommendations
+4. Query rewrite suggestions
+5. Before/after comparisons
+
+Reference: https://neo4j.com/docs/cypher-manual/current/planning-and-tuning/operators/
+"""
+        return context
+    
+    def _format_operator_details(self, operators: List[Dict]) -> str:
+        """Format operator details for context"""
+        if not operators:
+            return "No operators found"
+        
+        details = []
+        for i, op in enumerate(operators, 1):
+            details.append(f"""
+### Operator {i}: {op['operator']}
+- **Type**: {op['clean_operator']}
+- **Estimated Rows**: {op['estimated_rows']:,}
+- **DB Hits**: {op['db_hits']:,}
+- **Depth**: {op['depth']}
+- **Is Leaf**: {op['is_leaf']}
+- **Is Updating**: {op['is_updating']}
+- **Is Eager**: {op['is_eager']}
+- **Performance Indicators**: {', '.join(op['performance_characteristics']['performance_indicators'])}
+""")
+        
+        return '\n'.join(details)
 
 class Neo4jOptimizerAgent:
     """Agent for Neo4j query optimization with plan comparison"""
@@ -27,14 +399,11 @@ class Neo4jOptimizerAgent:
             print(f"⚠️  Neo4j connection not configured: {e}", file=sys.stderr)
             # Continue without connection for testing purposes
         
-        # Optimization rules for generating better queries
-        self.optimization_rules = {
-            "MATCH (n) RETURN n": "MATCH (n:Label) WHERE n.property IS NOT NULL RETURN n LIMIT 100",
-            "MATCH (n) WHERE": "Consider adding indexes on filtered properties",
-            "MATCH (a)-[]->(b)": "Consider specifying relationship types: MATCH (a)-[:TYPE]->(b)",
-            "ORDER BY": "Consider adding indexes on sorted properties",
-            "CARTESIAN PRODUCT": "Add WHERE clause to join conditions"
-        }
+        # Initialize analyzer
+        self.analyzer = Neo4jAnalyzer()
+        
+        # Initialize conversational interface
+        self.conversational_interface = ConversationalInterface(self.analyzer)
     
     def setup_neo4j_connection(self):
         """Initialize Neo4j connection"""
@@ -118,236 +487,58 @@ class Neo4jOptimizerAgent:
         
         return result
     
-    def analyze_plan_issues(self, plan: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Analyze query plan for performance issues with comprehensive operator coverage"""
-        issues = []
+    def analyze_plan_issues(self, plan: Dict[str, Any], query: str = "") -> List[Dict[str, Any]]:
+        """Extract structured operator data from query plan"""
+        # Extract operators from plan
+        operators = self._extract_operators_from_plan(plan)
         
-        def analyze_recursive(node, depth=0):
+        # Return structured operator data
+        return self.analyzer.analyze_operators(operators, query)
+    
+    def _extract_operators_from_plan(self, plan: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Extract operator information from query plan for analysis"""
+        operators = []
+        
+        def extract_recursive(node, depth=0):
+            if not node:
+                return
+            
             # Get operator from operatorType field
             operator = node.get("operatorType", node.get("operator", ""))
-            # Clean operator name (remove @neo4j suffix if present)
-            clean_operator = operator.split("@")[0] if "@" in operator else operator
             estimated_rows = node.get("estimated_rows", 0)
             db_hits = node.get("db_hits", 0)
+            args = node.get("args", {})
             
-            # CRITICAL PERFORMANCE ISSUES
-            if clean_operator == "AllNodesScan":
-                issues.append({
-                    "severity": "Critical",
+            operators.append({
                     "operator": operator,
-                    "issue": "Full database scan - extremely expensive operation",
-                    "suggestion": "Add labels (e.g., MATCH (n:Person)) or WHERE clauses to filter nodes before scanning",
+                "estimated_rows": estimated_rows,
+                "db_hits": db_hits,
                     "depth": depth,
-                    "impact": "Scans entire database - very slow on large datasets"
-                })
+                "args": args,
+                "identifiers": node.get("identifiers", [])
+            })
             
-            elif clean_operator == "CartesianProduct":
-                issues.append({
-                    "severity": "Critical", 
-                    "operator": operator,
-                    "issue": "Cartesian product detected - missing join condition",
-                    "suggestion": "Add WHERE clause to properly join nodes (e.g., WHERE a.id = b.id)",
-                    "depth": depth,
-                    "impact": "Exponential complexity - extremely expensive"
-                })
-            
-            elif clean_operator == "DirectedAllRelationshipsScan":
-                issues.append({
-                    "severity": "Critical",
-                    "operator": operator,
-                    "issue": "Scanning all relationships in database",
-                    "suggestion": "Specify relationship types (e.g., [:KNOWS]) or add node filters",
-                    "depth": depth,
-                    "impact": "Scans all relationships - very expensive"
-                })
-
-            elif clean_operator == "UndirectedAllRelationshipsScan":
-                issues.append({
-                    "severity": "Critical",
-                    "operator": operator,
-                    "issue": "Scanning all relationships in database",
-                    "suggestion": "Specify a relationship direction and relationship types (e.g., [:KNOWS])",
-                    "depth": depth,
-                    "impact": "Scans all relationships and produces 2x rows - very expensive"
-                })
-            
-            # HIGH PERFORMANCE ISSUES
-            elif clean_operator == "NodeByLabelScan":
-                issues.append({
-                    "severity": "High",
-                    "operator": operator,
-                    "issue": "Scanning all nodes with a specific label",
-                    "suggestion": "Create indexes on properties used in WHERE clauses",
-                    "depth": depth,
-                    "impact": "Scans all nodes of a label - expensive on large labels"
-                })
-            
-            elif clean_operator == "NodeIndexScan":
-                issues.append({
-                    "severity": "High",
-                    "operator": operator,
-                    "issue": "Scanning entire index instead of seeking",
-                    "suggestion": "Use NodeIndexSeek by adding equality conditions on indexed properties",
-                    "depth": depth,
-                    "impact": "Scans entire index - less efficient than seeking"
-                })
-            
-            elif clean_operator == "Expand(All)":
-                if estimated_rows > 10000:
-                    issues.append({
-                        "severity": "High",
-                        "operator": operator,
-                        "issue": f"Expanding many relationships ({estimated_rows} estimated)",
-                        "suggestion": "Add relationship type filters or node property filters to reduce expansion",
-                        "depth": depth,
-                        "impact": "Expanding many relationships - expensive operation"
-                    })
-            
-            # MEDIUM PERFORMANCE ISSUES
-            elif clean_operator == "Filter":
-                if estimated_rows > 10000:
-                    issues.append({
-                        "severity": "Medium",
-                        "operator": operator,
-                        "issue": f"Large filter operation ({estimated_rows} estimated rows)",
-                        "suggestion": "Move filter conditions earlier in query or add indexes on filtered properties",
-                        "depth": depth,
-                        "impact": "Filtering large datasets after retrieval"
-                    })
-            
-            elif clean_operator == "Sort":
-                if estimated_rows > 1000:
-                    issues.append({
-                        "severity": "Medium",
-                        "operator": operator,
-                        "issue": f"Large sort operation ({estimated_rows} estimated rows)",
-                        "suggestion": "Add indexes on sorted properties or use ORDER BY with LIMIT",
-                        "depth": depth,
-                        "impact": "Sorting large datasets in memory"
-                    })
-            
-            elif clean_operator == "EagerAggregation":
-                if estimated_rows > 10000:
-                    issues.append({
-                        "severity": "Medium",
-                        "operator": operator,
-                        "issue": f"Large aggregation ({estimated_rows} estimated rows)",
-                        "suggestion": "Add WHERE clauses to reduce data before aggregation",
-                        "depth": depth,
-                        "impact": "Aggregating large datasets"
-                    })
-            
-            elif clean_operator == "Unwind":
-                if estimated_rows > 1000:
-                    issues.append({
-                        "severity": "Medium",
-                        "operator": operator,
-                        "issue": f"Large unwind operation ({estimated_rows} estimated rows)",
-                        "suggestion": "Consider if unwinding is necessary or add LIMIT",
-                        "depth": depth,
-                        "impact": "Creating many rows from arrays"
-                    })
-            
-            elif clean_operator == "Limit":
-                if estimated_rows > 10000:
-                    issues.append({
-                        "severity": "Medium",
-                        "operator": operator,
-                        "issue": f"Large limit operation ({estimated_rows} estimated rows)",
-                        "suggestion": "Add LIMIT earlier in query or use ORDER BY with LIMIT",
-                        "depth": depth,
-                        "impact": "Processing many rows before limiting"
-                    })
-            
-            elif clean_operator == "Skip":
-                if estimated_rows > 1000:
-                    issues.append({
-                        "severity": "Medium",
-                        "operator": operator,
-                        "issue": f"Large skip operation ({estimated_rows} estimated rows)",
-                        "suggestion": "Consider using cursor-based pagination instead of SKIP",
-                        "depth": depth,
-                        "impact": "Skipping many rows is expensive"
-                    })
-            
-            # JOIN OPERATORS
-            elif clean_operator in ["NodeHashJoin", "NodeLeftOuterHashJoin","NodeRightOuterHashJoin"]:
-                if estimated_rows > 10000:
-                    issues.append({
-                        "severity": "Medium",
-                        "operator": operator,
-                        "issue": f"Large hash join ({estimated_rows} estimated rows)",
-                        "suggestion": "Using indexed properties may help; alternatively, explore Join Hints",
-                        "depth": depth,
-                        "impact": "Hash joining large datasets"
-                    })
-            
-            # GENERAL PERFORMANCE CHECKS
-            if db_hits > 10000:
-                issues.append({
-                    "severity": "High",
-                    "operator": clean_operator,
-                    "issue": f"High database hits ({db_hits}) for {operator}",
-                    "suggestion": "Consider adding indexes or restructuring query",
-                    "depth": depth,
-                    "impact": "Many database operations - indicates expensive query"
-                })
-            
-            # Analyze children
+            # Recursively extract from children
             for child in node.get("children", []):
-                analyze_recursive(child, depth + 1)
+                extract_recursive(child, depth + 1)
         
         if plan:
-            analyze_recursive(plan)
+            extract_recursive(plan)
         
-        return issues
+        return operators
     
-    def generate_optimized_query(self, original_query: str, issues: List[Dict[str, Any]]) -> str:
-        """Generate an optimized version of the query based on identified issues"""
+    def generate_optimized_query(self, original_query: str, operator_data: List[Dict[str, Any]]) -> str:
+        """Generate an optimized version of the query based on operator analysis"""
+        # For now, return the original query with basic optimizations
+        # The MCP client should handle the intelligent optimization based on operator data
         optimized = original_query.strip()
         
-        # Check for critical issues first
-        has_full_scan = any(issue["operator"] == "AllNodesScan" for issue in issues)
-        has_cartesian = any(issue["operator"] == "CartesianProduct" for issue in issues)
-        has_relationship_scan = any(issue["operator"] == "DirectedAllRelationshipsScan" for issue in issues)
-        has_large_sort = any(issue["operator"] == "Sort" and issue["severity"] in ["High", "Medium"] for issue in issues)
-        has_large_skip = any(issue["operator"] == "Skip" for issue in issues)
+        # Basic optimizations that are generally safe
+        if "MATCH (n)" in optimized and ":" not in optimized:
+            optimized = optimized.replace("MATCH (n)", "MATCH (n:Node)")
         
-        # Add optimization comments
-        optimization_comments = []
-        
-        if has_full_scan:
-            optimization_comments.append("// OPTIMIZATION: Add labels to MATCH clauses (e.g., MATCH (n:Person))")
-            # Replace full scans with label-based scans
-            if "MATCH (n)" in optimized and ":" not in optimized.split("MATCH (n)")[1].split(")")[0]:
-                optimized = optimized.replace("MATCH (n)", "MATCH (n:Label)")
-            
-            # Add filtering if none exists
-            if "WHERE" not in optimized.upper():
-                if "RETURN" in optimized:
-                    return_part = optimized.split("RETURN")[0] + "WHERE n.id IS NOT NULL RETURN" + optimized.split("RETURN")[1]
-                    optimized = return_part
-        
-        if has_cartesian:
-            optimization_comments.append("// OPTIMIZATION: Add WHERE clause to join conditions (e.g., WHERE a.id = b.id)")
-        
-        if has_relationship_scan:
-            optimization_comments.append("// OPTIMIZATION: Specify relationship types (e.g., [:KNOWS])")
-        
-        if has_large_sort:
-            optimization_comments.append("// OPTIMIZATION: Consider adding indexes on sorted properties")
-        
-        if has_large_skip:
-            optimization_comments.append("// OPTIMIZATION: Consider cursor-based pagination instead of SKIP")
-        
-        # Add LIMIT if missing and not a COUNT query
         if "LIMIT" not in optimized.upper() and "COUNT(" not in optimized.upper():
             optimized += " LIMIT 1000"
-            optimization_comments.append("// OPTIMIZATION: Added LIMIT to prevent large result sets")
-        
-        # Prepend optimization comments
-        if optimization_comments:
-            optimized = "\n".join(optimization_comments) + "\n" + optimized
         
         return optimized
     
@@ -489,7 +680,7 @@ def list_tools(request_id: Any) -> Dict[str, Any]:
                 },
                 "required": ["query"]
             }
-        }
+        },
     ]
     
     return {
@@ -530,19 +721,22 @@ def optimize_neo4j_query(arguments: Dict[str, Any]) -> str:
         raise ValueError("Query is required")
     
     try:
+        # Initialize agent
+        agent = Neo4jOptimizerAgent()
+        
         # Step 1: Get original query plan
         print("🔍 Analyzing original query...", file=sys.stderr)
         original_plan_data = agent.get_query_plan(query, database)
-        original_issues = agent.analyze_plan_issues(original_plan_data["explain_plan"])
+        original_operator_data = agent.analyze_plan_issues(original_plan_data["explain_plan"], query)
         
         # Step 2: Generate optimized query
         print("⚡ Generating optimized query...", file=sys.stderr)
-        optimized_query = agent.generate_optimized_query(query, original_issues)
+        optimized_query = agent.generate_optimized_query(query, original_operator_data)
         
         # Step 3: Get optimized query plan
         print("📊 Analyzing optimized query...", file=sys.stderr)
         optimized_plan_data = agent.get_query_plan(optimized_query, database)
-        optimized_issues = agent.analyze_plan_issues(optimized_plan_data["explain_plan"])
+        optimized_operator_data = agent.analyze_plan_issues(optimized_plan_data["explain_plan"], optimized_query)
         
         # Step 4: Compare plans
         comparison = agent.compare_plans(
@@ -550,7 +744,10 @@ def optimize_neo4j_query(arguments: Dict[str, Any]) -> str:
             optimized_plan_data["explain_plan"]
         )
         
-        # Format comprehensive response
+        # Step 5: Generate comprehensive analysis
+        original_analysis = agent.analyzer.analyze_query(query, agent._extract_operators_from_plan(original_plan_data["explain_plan"]))
+        
+        # Format comprehensive response with structured data
         response = f"""# Neo4j Query Optimization Analysis
 
 ## 📝 Original Query
@@ -567,46 +764,12 @@ def optimize_neo4j_query(arguments: Dict[str, Any]) -> str:
 **Execution Time**: {original_plan_data['execution_time'] or 'N/A'}ms
 **Estimated Total Rows**: {comparison['original_estimated_rows']:,}
 
-### Performance Issues Found:
-"""
-        
-        if original_issues:
-            for issue in original_issues:
-                impact_info = f"- Impact: {issue.get('impact', 'Performance impact')}" if 'impact' in issue else ""
-                response += f"""
-**{issue['severity']} - {issue['operator']}**
-- Issue: {issue['issue']}
-- Suggestion: {issue['suggestion']}
-- Depth: {issue['depth']}
-{impact_info}
-"""
-        else:
-            response += "\n✅ No major performance issues detected\n"
-        
-        response += f"""
 ### Original Plan Operators:
 {chr(10).join(f"- **{op}**: {count}" for op, count in comparison['original_operators'].items())}
 
 ## 📊 Optimized Query Plan Analysis
 **Estimated Total Rows**: {comparison['optimized_estimated_rows']:,}
 
-### Performance Issues Remaining:
-"""
-        
-        if optimized_issues:
-            for issue in optimized_issues:
-                impact_info = f"- Impact: {issue.get('impact', 'Performance impact')}" if 'impact' in issue else ""
-                response += f"""
-**{issue['severity']} - {issue['operator']}**
-- Issue: {issue['issue']}
-- Suggestion: {issue['suggestion']}
-- Depth: {issue['depth']}
-{impact_info}
-"""
-        else:
-            response += "\n✅ No major performance issues detected\n"
-        
-        response += f"""
 ### Optimized Plan Operators:
 {chr(10).join(f"- **{op}**: {count}" for op, count in comparison['optimized_operators'].items())}
 
@@ -615,13 +778,15 @@ def optimize_neo4j_query(arguments: Dict[str, Any]) -> str:
 
 ## 📈 Performance Comparison:
 - **Row Estimation Change**: {comparison['original_estimated_rows']:,} → {comparison['optimized_estimated_rows']:,}
-- **Issues Resolved**: {len(original_issues) - len(optimized_issues)} out of {len(original_issues)}
 
 ## 💡 Next Steps:
 1. Test the optimized query with your actual data
 2. Consider creating suggested indexes for better performance
 3. Monitor query execution times in production
 4. Adjust LIMIT values based on your actual needs
+
+## 🗣️ Structured Data for MCP Client Analysis
+{agent.conversational_interface.generate_rich_context(query, original_analysis)}
 """
         
         return response
@@ -638,8 +803,14 @@ def analyze_query_plan_only(arguments: Dict[str, Any]) -> str:
         raise ValueError("Query is required")
     
     try:
+        # Initialize agent
+        agent = Neo4jOptimizerAgent()
+        
         plan_data = agent.get_query_plan(query, database)
-        issues = agent.analyze_plan_issues(plan_data["explain_plan"])
+        operator_data = agent.analyze_plan_issues(plan_data["explain_plan"], query)
+        
+        # Generate comprehensive analysis
+        analysis = agent.analyzer.analyze_query(query, agent._extract_operators_from_plan(plan_data["explain_plan"]))
         
         response = f"""# Query Plan Analysis
 
@@ -657,20 +828,18 @@ def analyze_query_plan_only(arguments: Dict[str, Any]) -> str:
 ```
 
 ## Performance Analysis
+**Total Operators**: {analysis['summary']['total_operators']}
+**Leaf Operators**: {analysis['summary']['leaf_operators']}
+**Eager Operators**: {analysis['summary']['eager_operators']}
+**Estimated Total Rows**: {analysis['summary']['estimated_total_rows']:,}
+**Estimated DB Hits**: {analysis['summary']['estimated_db_hits']:,}
+
+### Performance Indicators
+{chr(10).join([f"- {indicator}" for indicator in analysis['performance_indicators']])}
+
+## 🗣️ Structured Data for MCP Client Analysis
+{agent.conversational_interface.generate_rich_context(query, analysis)}
 """
-        
-        if issues:
-            for issue in issues:
-                impact_info = f"- **Impact**: {issue.get('impact', 'Performance impact')}" if 'impact' in issue else ""
-                response += f"""
-### {issue['severity']} Issue - {issue['operator']}
-- **Problem**: {issue['issue']}
-- **Suggestion**: {issue['suggestion']}
-- **Location**: Depth {issue['depth']} in execution plan
-{impact_info}
-"""
-        else:
-            response += "\n✅ No major performance issues detected"
         
         return response
         

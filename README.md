@@ -8,17 +8,19 @@
 
 > **⚠️ Work in Progress**: This repository is actively being developed. Feel free to try it out and provide feedback, but expect some changes and improvements as we development continues.
 
-A comprehensive MCP (Model Context Protocol) server for analyzing and optimizing Neo4j Cypher queries using intelligent operator-based analysis. Perfect for integration with Claude Desktop and other MCP clients.
+A comprehensive MCP (Model Context Protocol) server that extracts structured operator data from Neo4j query plans and provides rich context for MCP clients to interpret and provide intelligent optimization recommendations. Perfect for integration with Claude Desktop and other MCP clients.
 
 ## ✨ Features
 
-- **🔍 Query Plan Analysis**: Analyzes Neo4j query execution plans
-- **🚨 Performance Issue Detection**: Identifies critical, high, medium, and low severity issues
-- **💡 Smart Recommendations**: Provides specific, actionable optimization advice
-- **📚 Index Suggestions**: Generates exact CREATE INDEX statements
-- **✏️ Query Rewrites**: Shows before/after query examples
-- **⚡ MCP Integration**: Works seamlessly with Claude Desktop and other MCP clients
-- **📊 Detailed Analytics**: Comprehensive analysis with severity levels and impact assessment
+- **🔍 Structured Data Extraction**: Extracts comprehensive operator data from Neo4j query plans
+- **📊 Performance Analysis**: Identifies performance indicators and characteristics
+- **🎯 Operator Classification**: Based on official [Neo4j operators documentation](https://neo4j.com/docs/cypher-manual/current/planning-and-tuning/operators/)
+- **🧠 MCP Client Intelligence**: Provides rich context for intelligent recommendations
+- **⚡ Query Optimization**: Basic optimization with before/after comparisons
+- **🧪 Comprehensive Testing**: 38 unit tests ensuring reliability
+- **🔗 Universal Compatibility**: Works with any MCP client (Claude Desktop, etc.)
+- **📈 Rich Context**: Structured data for intelligent conversations
+- **🚀 Fast & Reliable**: No external API dependencies, works offline
 
 ## 🚀 Quick Start
 
@@ -48,6 +50,13 @@ A comprehensive MCP (Model Context Protocol) server for analyzing and optimizing
    Add the server to your Claude Desktop or other MCP client configuration
 
 ## 🎯 Usage
+
+### Available Tools
+
+The MCP server provides two main tools:
+
+1. **`optimize-neo4j-query`**: Full optimization workflow with before/after comparison and rich context for conversations
+2. **`analyze-query-plan`**: Single query plan analysis with rich context for discussions
 
 ### Claude Desktop Integration
 
@@ -120,16 +129,55 @@ The optimizer provides:
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Claude        │    │   MCP Server     │    │   Neo4j         │
-│   Desktop       │◄──►│                  │◄──►│   Database      │
+│   MCP Client    │    │   MCP Server     │    │   Neo4j         │
+│ (Claude, etc.)  │◄──►│                  │◄──►│   Database      │
+│                 │    │                  │    │                 │
+│ • Interprets    │    │ • Extracts       │    │ • Query Plans   │
+│   operators     │    │   operator data  │    │ • Execution     │
+│ • Provides      │    │ • Classifies     │    │   Stats         │
+│   recommendations│    │   operators      │    │                 │
+│ • Generates     │    │ • Structures     │    │                 │
+│   optimizations │    │   data           │    │                 │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
-                              │
-                              ▼
-                       ┌──────────────────┐
-                       │ Query Optimizer  │
-                       │ (Operator-based) │
-                       └──────────────────┘
 ```
+
+### 🎯 **Proper MCP Architecture**
+
+**MCP Server Responsibilities:**
+- Extracts structured operator data from Neo4j query plans
+- Classifies operators based on official Neo4j documentation
+- Provides performance indicators and characteristics
+- Structures data for MCP client interpretation
+
+**MCP Client Responsibilities:**
+- Interprets operator data using knowledge of Neo4j operators
+- Provides intelligent recommendations and optimizations
+- Generates educational content and best practices
+- Creates before/after comparisons and explanations
+
+## 🔄 Recent Refactoring (v2.0) - Proper MCP Architecture
+
+**Major Changes:**
+- ✅ **Removed LLM Dependencies**: No more OpenAI/Anthropic API calls within the MCP server
+- ✅ **Structured Data Extraction**: MCP server extracts operator data, client provides intelligence
+- ✅ **Operator Classification**: Based on official [Neo4j operators documentation](https://neo4j.com/docs/cypher-manual/current/planning-and-tuning/operators/)
+- ✅ **Proper MCP Pattern**: Server provides data, client interprets and recommends
+- ✅ **Comprehensive Testing**: Added 38 unit tests covering all functionality
+- ✅ **Better Performance**: Faster analysis without external API calls
+- ✅ **Universal Compatibility**: Works with any MCP client, not just Claude Desktop
+
+**Proper MCP Architecture:**
+- 🎯 **MCP Server**: Extracts structured operator data from Neo4j query plans
+- 🧠 **MCP Client**: Uses knowledge of Neo4j operators to provide intelligent recommendations
+- 📊 **Structured Data**: Rich context with operator details, performance indicators, and metadata
+- 🔗 **Official Reference**: Links to Neo4j documentation for operator understanding
+
+**Benefits:**
+- 🚀 **Faster**: No API calls within the MCP server
+- 💰 **Cost-Effective**: No external LLM API costs
+- 🔒 **More Reliable**: No dependency on external services
+- 🧪 **Well-Tested**: Comprehensive test coverage
+- 🎯 **Proper Separation**: MCP server = data extraction, MCP client = intelligence
 
 ## 🔍 Example Analysis
 
@@ -138,42 +186,80 @@ The optimizer provides:
 MATCH (n) WHERE n.name = 'test' RETURN n LIMIT 10
 ```
 
-**Analysis Results**:
+**Structured Data Output**:
 ```json
 {
-  "performance_issues": [
-    "Full database scan - very expensive operation (Severity: Critical)",
-    "Filter applied after data retrieval (Severity: Medium)",
-    "Limiting results - this is good (Severity: Low)"
+  "query": "MATCH (n) WHERE n.name = 'test' RETURN n LIMIT 10",
+  "query_type": "read",
+  "complexity": "medium",
+  "query_patterns": ["node matching", "property filtering", "result limiting"],
+  "operators": [
+    {
+      "operator": "NodeByLabelScan",
+      "clean_operator": "NodeByLabelScan",
+      "estimated_rows": 1000,
+      "db_hits": 1000,
+      "is_leaf": true,
+      "is_updating": false,
+      "is_eager": false,
+      "performance_characteristics": {
+        "operator_type": "NodeByLabelScan",
+        "estimated_rows": 1000,
+        "db_hits": 1000,
+        "performance_indicators": ["high_row_count"]
+      }
+    }
   ],
-  "recommendations": [
-    "Create indexes on frequently queried properties (Priority: Critical)",
-    "Move filter conditions earlier in the query (Priority: Medium)"
-  ],
-  "index_suggestions": [
-    "CREATE INDEX FOR (n:Label) ON (n.property)"
-  ],
-  "query_rewrites": [
-    "MATCH (n) WHERE n.property = value → MATCH (n:Label {property: value})"
-  ]
+  "summary": {
+    "total_operators": 3,
+    "leaf_operators": 1,
+    "updating_operators": 0,
+    "eager_operators": 0,
+    "estimated_total_rows": 1000,
+    "estimated_db_hits": 1000
+  },
+  "performance_indicators": ["high_row_count"],
+  "query_metadata": {
+    "has_where_clause": true,
+    "has_order_by": false,
+    "has_limit": true,
+    "has_aggregation": false,
+    "has_relationships": false
+  }
 }
 ```
+
+**MCP Client Interpretation**:
+Based on this structured data, the MCP client can provide:
+- **Performance Analysis**: High row count indicates potential performance issues
+- **Optimization Suggestions**: Create indexes on filtered properties
+- **Index Recommendations**: `CREATE INDEX FOR (n:Node) ON (n.name)`
+- **Best Practices**: Use labels in MATCH clauses for better performance
 
 ## 🛠️ MCP Tools
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
-| `optimize-neo4j-query` | Complete optimization workflow | `query` (required), `database` (optional) |
-| `analyze-query-plan` | Single query plan analysis | `query` (required), `database` (optional) |
+| `optimize-neo4j-query` | Analyze and optimize a Neo4j query with before/after comparison | `query` (required), `database` (optional) |
+| `analyze-query-plan` | Get detailed structured analysis of a query execution plan | `query` (required), `database` (optional) |
+
+### 📋 **Tool Outputs**
+
+Both tools provide:
+- **Structured operator data** with performance characteristics
+- **Query metadata** and patterns
+- **Performance indicators** for MCP client interpretation
+- **Rich context** for intelligent recommendations
+- **References** to official Neo4j documentation
 
 ## 🎨 MCP Agent Features
 
-- **Real Database Analysis**: Connects to your actual Neo4j database
-- **Comprehensive Operator Coverage**: Analyzes 15+ Neo4j query plan operators
-- **Before/After Comparison**: Shows exact performance improvements
-- **Actionable Recommendations**: Specific index suggestions and query rewrites
-- **Severity-based Analysis**: Critical, High, Medium, and Low priority issues
-- **Claude Integration**: Works seamlessly with Claude Desktop
+- **Structured Data Extraction**: Extracts comprehensive operator data from Neo4j query plans
+- **Operator Classification**: Based on official [Neo4j operators documentation](https://neo4j.com/docs/cypher-manual/current/planning-and-tuning/operators/)
+- **Performance Analysis**: Identifies performance indicators and characteristics
+- **Rich Context Generation**: Provides structured data for MCP client interpretation
+- **Universal Compatibility**: Works with any MCP client (Claude Desktop, etc.)
+- **Offline Operation**: No external API dependencies, works completely offline
 
 ## 🔧 Configuration
 
@@ -181,12 +267,13 @@ MATCH (n) WHERE n.name = 'test' RETURN n LIMIT 10
 
 Add this to your Claude Desktop or other MCP client configuration:
 
+**For Claude Desktop** (macOS):
 ```json
 {
   "mcpServers": {
-    "neo4j-optimizer-agent": {
-      "command": "python",
-      "args": ["/path/to/your/src/mcp_neo4j_optimizer/agent.py"],
+    "neo4j-query-optimizer": {
+      "command": "/Users/sohamdhodapkar/anaconda3/bin/python",
+      "args": ["/Users/sohamdhodapkar/Projects/internal/mcp-query-optimizer/src/mcp_neo4j_optimizer/agent.py"],
       "env": {
         "NEO4J_URI": "neo4j+s://your-db-id.databases.neo4j.io",
         "NEO4J_USER": "neo4j", 
@@ -197,13 +284,56 @@ Add this to your Claude Desktop or other MCP client configuration:
 }
 ```
 
+**Configuration File Location**:
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+**Important Notes**:
+- Replace the Python path with your actual Python executable path
+- Replace the project path with your actual project location
+- The MCP server works even without Neo4j credentials (rule-based analysis mode)
+
 ### Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `NEO4J_URI` | Neo4j database URI | Yes |
-| `NEO4J_USER` | Neo4j username | Yes |
-| `NEO4J_PASSWORD` | Neo4j password | Yes |
+| Variable | Description | Required | Default |
+|----------|-------------|----------|---------|
+| `NEO4J_URI` | Neo4j database URI | No* | `bolt://localhost:7687` |
+| `NEO4J_USER` | Neo4j username | No* | `neo4j` |
+| `NEO4J_PASSWORD` | Neo4j password | No* | `password` |
+
+*Required for live database analysis. The MCP server works in rule-based analysis mode without these credentials.
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+**1. MCP Server Not Loading**
+- Check that the Python path in your configuration is correct
+- Ensure the script path points to the actual `agent.py` file
+- Verify the script is executable: `chmod +x src/mcp_neo4j_optimizer/agent.py`
+
+**2. "No tools available" Error**
+- Restart Claude Desktop completely after configuration changes
+- Check the configuration file syntax with a JSON validator
+- Ensure the MCP server name matches in your configuration
+
+**3. Neo4j Connection Issues**
+- The MCP server works without Neo4j credentials (rule-based mode)
+- For live database analysis, verify your Neo4j credentials
+- Check that your Neo4j database is accessible from your machine
+
+**4. Python Dependencies**
+- Install required dependencies: `pip install neo4j python-dotenv`
+- Ensure you're using the correct Python environment
+
+### Testing the MCP Server
+
+Test the MCP server directly:
+```bash
+echo '{"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}' | python src/mcp_neo4j_optimizer/agent.py
+```
+
+You should see a JSON response with available tools.
 
 ## 🤝 Contributing
 
