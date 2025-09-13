@@ -81,25 +81,6 @@ echo '{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}' | python src/mcp_neo4
 echo '{"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "optimize-neo4j-query", "arguments": {"query": "MATCH (n) RETURN n"}}}' | python src/mcp_neo4j_optimizer/agent.py
 ```
 
-## 🔧 Supported Operators
-
-The optimizer analyzes these Neo4j query plan operators:
-
-| Operator | Severity | Description |
-|----------|----------|-------------|
-| **AllNodesScan** | Critical | Full database scan |
-| **NodeByLabelScan** | High | Label-based scan |
-| **NodeIndexScan** | Low | Index usage (good) |
-| **CartesianProduct** | Critical | Cross-join operation |
-| **Expand(All)** | Medium | Relationship expansion |
-| **Filter** | Medium | Late-applied filters |
-| **Sort** | Medium | Sorting operations |
-| **Limit** | Low | Result limiting (good) |
-| **Skip** | Medium | Pagination operations |
-| **EagerAggregation** | Medium | Data aggregation |
-| **DirectedAllRelationshipsScan** | High | Relationship scans |
-| **UndirectedAllRelationshipsScan** | Critical | Bidirectional scans |
-
 ## 📊 Analysis Output
 
 The optimizer provides:
@@ -158,26 +139,15 @@ The optimizer provides:
 ## 🔄 Recent Refactoring (v2.0) - Proper MCP Architecture
 
 **Major Changes:**
-- ✅ **Removed LLM Dependencies**: No more OpenAI/Anthropic API calls within the MCP server
 - ✅ **Structured Data Extraction**: MCP server extracts operator data, client provides intelligence
-- ✅ **Operator Classification**: Based on official [Neo4j operators documentation](https://neo4j.com/docs/cypher-manual/current/planning-and-tuning/operators/)
-- ✅ **Proper MCP Pattern**: Server provides data, client interprets and recommends
+- ✅ **Operator Classification**: Based on [Neo4j operators documentation](https://neo4j.com/docs/cypher-manual/current/planning-and-tuning/operators/)
 - ✅ **Comprehensive Testing**: Added 38 unit tests covering all functionality
-- ✅ **Better Performance**: Faster analysis without external API calls
-- ✅ **Universal Compatibility**: Works with any MCP client, not just Claude Desktop
 
 **Proper MCP Architecture:**
 - 🎯 **MCP Server**: Extracts structured operator data from Neo4j query plans
 - 🧠 **MCP Client**: Uses knowledge of Neo4j operators to provide intelligent recommendations
 - 📊 **Structured Data**: Rich context with operator details, performance indicators, and metadata
 - 🔗 **Official Reference**: Links to Neo4j documentation for operator understanding
-
-**Benefits:**
-- 🚀 **Faster**: No API calls within the MCP server
-- 💰 **Cost-Effective**: No external LLM API costs
-- 🔒 **More Reliable**: No dependency on external services
-- 🧪 **Well-Tested**: Comprehensive test coverage
-- 🎯 **Proper Separation**: MCP server = data extraction, MCP client = intelligence
 
 ## 🔍 Example Analysis
 
@@ -272,8 +242,8 @@ Add this to your Claude Desktop or other MCP client configuration:
 {
   "mcpServers": {
     "neo4j-query-optimizer": {
-      "command": "/Users/sohamdhodapkar/anaconda3/bin/python",
-      "args": ["/Users/sohamdhodapkar/Projects/internal/mcp-query-optimizer/src/mcp_neo4j_optimizer/agent.py"],
+      "command": "python",
+      "args": ["/path/to/your/mcp-query-optimizer/src/mcp_neo4j_optimizer/agent.py"],
       "env": {
         "NEO4J_URI": "neo4j+s://your-db-id.databases.neo4j.io",
         "NEO4J_USER": "neo4j", 
@@ -291,7 +261,6 @@ Add this to your Claude Desktop or other MCP client configuration:
 **Important Notes**:
 - Replace the Python path with your actual Python executable path
 - Replace the project path with your actual project location
-- The MCP server works even without Neo4j credentials (rule-based analysis mode)
 
 ### Environment Variables
 
